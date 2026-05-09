@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studi Master Dashboard</title>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #a29bfe;
+            --dark: #2d3436;
+            --light: #dfe6e9;
+            --success: #00b894;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; margin: 0; padding: 20px; }
+        .container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: var(--dark); margin-top: 0; }
+        
+        /* Pomodoro */
+        .timer-display { font-size: 3rem; text-align: center; margin: 10px 0; color: var(--primary); }
+        .timer-buttons { display: flex; justify-content: center; gap: 10px; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; background: var(--secondary); color: white; }
+        button:hover { background: var(--primary); }
+        input[type=number] { width: 50px; padding: 5px; }
+
+        /* Planner */
+        .todo-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #eee; }
+        
+        /* Achivements */
+        #achievements-list { font-style: italic; color: #636e72; }
+        .badge { background: var(--success); color: white; padding: 2px 5px; border-radius: 3px; font-size: 0.8rem; margin: 2px; display: inline-block; }
+    </style>
+</head>
+<body>
+
+<h1>📚 Dashboard di Studio</h1>
+
+<div class="container">
+    <!-- 1. Pomodoro Timer -->
+    <div class="card" id="pomodoro">
+        <h2>Pomodoro Timer</h2>
+        <div class="timer-display" id="display">25:00</div>
+        <div class="timer-buttons">
+            <input type="number" id="minutes" value="25" min="1" max="60"> min
+            <button onclick="startTimer()">Start</button>
+            <button onclick="resetTimer()">Reset</button>
+        </div>
+        <p id="motivational" style="color: var(--success); font-weight: bold; text-align: center;"></p>
+    </div>
+
+    <!-- 2. Calendar -->
+    <div class="card">
+        <h2>Calendario Eventi</h2>
+        <input type="date" id="event-date">
+        <input type="text" id="event-name" placeholder="Nome evento">
+        <button onclick="addEvent()">Aggiungi</button>
+        <ul id="events-list"></ul>
+    </div>
+
+    <!-- 3. Voti e Media -->
+    <div class="card">
+        <h2>Voti e Media</h2>
+        <input type="text" id="subject-name" placeholder="Materia">
+        <input type="number" id="grade" placeholder="Voto" min="1" max="30">
+        <button onclick="addGrade()">Aggiungi Voto</button>
+        <p>Media: <span id="average">0</span></p>
+        <canvas id="gradeChart"></canvas>
+    </div>
+
+    <!-- 4. Planner Materie -->
+    <div class="card">
+        <h2>Planner Studi</h2>
+        <input type="text" id="study-task" placeholder="Cosa studiare?">
+        <button onclick="addTask()">Aggiungi</button>
+        <ul id="task-list"></ul>
+    </div>
+
+    <!-- 5. Bacheca Achievement -->
+    <div class="card">
+        <h2>🏆 Bacheca Achievement</h2>
+        <div id="achievements-list"></div>
+    </div>
+</div>
+
+<script>
+    // --- POMODORO TIMER ---
+    let timer;
+    let secondsLeft = 25 * 60;
+    let pomodoroCount = 0;
+
+    function startTimer() {
+        const minInput = document.getElementById('minutes').value;
+        secondsLeft = minInput * 60;
+        clearInterval(timer);
+        timer = setInterval(() => {
+            secondsLeft--;
+            updateDisplay(secondsLeft);
+            if (secondsLeft <= 0) {
+                clearInterval(timer);
+                pomodoroCount++;
+                checkAchievements();
+            }
+        }, 1000);
+    }
+
+    function updateDisplay(secs) {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        document.getElementById('display').innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function resetTimer() {
+        clearInterval(timer);
+        secondsLeft = document.getElementById('minutes').value * 60;
+        updateDisplay(secondsLeft);
+    }
+
+    // --- ACHIEVEMENTS ---
+    function checkAchievements() {
+        const message = document.getElementById('motivational');
+        const list = document.getElementById('achievements-list');
+        
+        if (pomodoroCount === 2) {
+            message.innerText = "🌟 Bravo! Hai completato 2 sessioni! Continua così!";
+            list.innerHTML += '<span class="badge">Pomodoro Master (2x)</span>';
+        } else if (pomodoroCount === 4) {
+            message.innerText = "🚀 Inarrestabile! 4 sessioni completate!";
+            list.innerHTML += '<span class="badge">Sessione Intensa (4x)</span>';
+        }
+    }
+
+    // --- CALENDARIO (Local Storage) ---
+    function addEvent() {
+        const date = document.getElementById('event-date').value;
+        const name = document.getElementById('event-name').value;
+        if(date && name) {
+            localStorage.setItem(date, name);
+            loadEvents();
+        }
+    }
+
+    function loadEvents() {
+        const list = document.getElementById('events-list');
+        list.innerHTML = "";
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if(key.includes('-')) { // check if it's a date
+                list.innerHTML += `<li>${key}: ${localStorage.getItem(key)}</li>`;
+            }
+        }
+    }
+
+    // --- VOTI E GRAFICO ---
+    let grades = JSON.parse(localStorage.getItem('grades')) || [];
+    let subjects = JSON.parse(localStorage.getItem('subjects')) || [];
+    let myChart;
+
+    function addGrade() {
+        const sub = document.getElementById('subject-name').value;
+        const grad = parseFloat(document.getElementById('grade').value);
+        if(sub && grad) {
+            grades.push(grad);
+            subjects.push(sub);
+            localStorage.setItem('grades', JSON.stringify(grades));
+            localStorage.setItem('subjects', JSON.stringify(subjects));
+            updateGradeUI();
+        }
+    }
+
+    function updateGradeUI() {
+        const avg = grades.reduce((a,b) => a+b, 0) / grades.length;
+        document.getElementById('average').innerText = avg.toFixed(2);
+        
+        if(myChart) myChart.destroy();
+        const ctx = document.getElementById('gradeChart').getContext('2d');
+        myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: subjects,
+                datasets: [{ label: 'Voti', data: grades, backgroundColor: '#a29bfe' }]
+            }
+        });
+    }
+
+    // --- PLANNER MATERIE ---
+    function addTask() {
+        const task = document.getElementById('study-task').value;
+        if(task) {
+            document.getElementById('task-list').innerHTML += `<div class="todo-item"><input type="checkbox"> ${task}</div>`;
+            document.getElementById('study-task').value = "";
+        }
+    }
+
+    // Initialize
+    loadEvents();
+    updateGradeUI();
+</script>
+
+</body>
+</html>
